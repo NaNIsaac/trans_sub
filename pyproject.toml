@@ -10,3 +10,7 @@ dependencies = [
 
 [tool.ruff]
 line-length = 100
+
+# violations present when ruff became mandatory in CI; remove entries as they are fixed
+[tool.ruff.lint.extend-per-file-ignores]
+"main.py" = ["F401", "I001"]
