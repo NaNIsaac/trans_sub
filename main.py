@@ -1,5 +1,3 @@
-import srt
-
 def main():
     print("Hello from trans-sub!")
 
