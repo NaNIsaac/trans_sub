@@ -1,5 +1,7 @@
 # trans_sub
 
+[한국어](README.ko.md)
+
 AI translation of `.srt` subtitle files: SRT in, a context-aware translation of the whole file, SRT out. It started as a tool to help produce YouTube subtitles and is meant to stay a practical tool for that.
 
 **Status: early, unfinished.** Only the project skeleton exists. `main.py` prints a greeting; there is no translation code yet. The plan for resuming is below.
