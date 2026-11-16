@@ -1,7 +1,5 @@
 """Offline tests for the trans_sub glue around pysubtrans."""
 
-from __future__ import annotations
-
 from copy import deepcopy
 from pathlib import Path
 
@@ -15,6 +13,7 @@ from PySubtrans.TranslationPrompt import TranslationPrompt
 from PySubtrans.TranslationProvider import TranslationProvider
 from PySubtrans.TranslationRequest import TranslationRequest
 
+import trans_sub
 from trans_sub import PROVIDER_KEY_ENV, default_output_path, translate_srt
 from trans_sub.cli import main
 
@@ -25,9 +24,10 @@ SAMPLE_SRT = (
 
 
 class _FakeTranslationClient(TranslationClient):
-    def __init__(self, settings: SettingsType):
+    def __init__(self, settings: SettingsType, *, drop_last: bool = False):
         super().__init__(settings)
         self._last_lines: list = []
+        self._drop_last = drop_last
 
     def BuildTranslationPrompt(
         self,
@@ -46,9 +46,10 @@ class _FakeTranslationClient(TranslationClient):
     def _request_translation(
         self, request: TranslationRequest, temperature: float | None = None
     ) -> Translation:
+        target = self._last_lines[:-1] if self._drop_last else self._last_lines
         blocks = [
             f"#{line.number}\nOriginal>\n{line.text}\nTranslation>\n[ko] {line.text}"
-            for line in self._last_lines
+            for line in target
         ]
         return Translation({"text": "\n\n".join(blocks)})
 
@@ -56,13 +57,14 @@ class _FakeTranslationClient(TranslationClient):
 class _FakeProvider(TranslationProvider):
     name = "FakeProvider"
 
-    def __init__(self, model: str = "fake-model"):
+    def __init__(self, model: str = "fake-model", *, drop_last: bool = False):
         super().__init__(self.name, SettingsType({"model": model}))
+        self._drop_last = drop_last
 
     def GetTranslationClient(self, settings: SettingsType) -> TranslationClient:
         merged = deepcopy(self.settings)
         merged.update(settings)
-        return _FakeTranslationClient(merged)
+        return _FakeTranslationClient(merged, drop_last=self._drop_last)
 
     def ValidateSettings(self) -> bool:
         return True
@@ -167,3 +169,26 @@ def test_translate_srt_with_fake_provider_and_resume(tmp_path: Path):
         "[ko] Hello world.",
         "[ko] Second subtitle line.",
     ]
+
+
+def test_cli_partial_translation_exits_1_and_writes_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    src = tmp_path / "partial.srt"
+    src.write_text(SAMPLE_SRT, encoding="utf-8")
+    monkeypatch.setenv("LLM_SUBTRANS_CONFIG_PATH", str(tmp_path / "cfg"))
+    monkeypatch.setattr(
+        trans_sub, "_resolve_provider", lambda _provider, _options: _FakeProvider(drop_last=True)
+    )
+
+    code = main([str(src), "--to", "ko", "--provider", "OpenRouter"])
+    assert code == 1
+
+    out = tmp_path / "partial.ko.srt"
+    assert out.exists()
+    translated_cues = list(srt.parse(out.read_text(encoding="utf-8")))
+    assert [c.content for c in translated_cues] == ["[ko] Hello world."]
+
+    stdout = capsys.readouterr().out
+    assert "1/2 lines" in stdout
+    assert "1 missing" in stdout

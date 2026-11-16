@@ -28,12 +28,21 @@ uv sync --extra gemini
 
 ## Usage
 
-No default provider is built in, so `--provider` is always required. Keys come from each provider's environment variable; nothing accepts `--api-key`.
+No default provider is built in, so `--provider` is always required. Credentials come from each provider's environment variable.
 
 ### Hosted provider
 
+Shell:
+
 ```sh
 export OPENROUTER_API_KEY="your-key"
+uv run trans-sub movie.srt --to ko --provider OpenRouter
+```
+
+PowerShell:
+
+```powershell
+$env:OPENROUTER_API_KEY = "your-key"
 uv run trans-sub movie.srt --to ko --provider OpenRouter
 ```
 
@@ -41,8 +50,17 @@ Optional extras (`openai`, `gemini`, `claude`, `mistral`, `azure`, `bedrock`, `l
 
 ### Local OpenAI-compatible server
 
+Shell:
+
 ```sh
 export CUSTOM_SERVER_ADDRESS="http://<host>:<port>"
+uv run trans-sub movie.srt --to ko --provider "Custom Server" --model "<model-name>"
+```
+
+PowerShell:
+
+```powershell
+$env:CUSTOM_SERVER_ADDRESS = "http://<host>:<port>"
 uv run trans-sub movie.srt --to ko --provider "Custom Server" --model "<model-name>"
 ```
 

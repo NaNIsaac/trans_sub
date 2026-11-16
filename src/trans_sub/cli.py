@@ -1,7 +1,5 @@
 """CLI entry point for ``trans-sub``."""
 
-from __future__ import annotations
-
 import argparse
 import sys
 from collections.abc import Sequence
@@ -67,11 +65,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"Dry run: {summary.lines_total} lines, {summary.scenes} scene(s), "
             f"{summary.batches} batch(es) ({summary.provider}) -> {summary.output}"
         )
-    else:
+        return 0
+
+    if summary.lines_translated < summary.lines_total:
+        missing = summary.lines_total - summary.lines_translated
         print(
             f"Translated {summary.lines_translated}/{summary.lines_total} lines "
-            f"({summary.provider}) -> {summary.output}"
+            f"({missing} missing, {summary.provider}) -> {summary.output}"
         )
+        return 1
+
+    print(
+        f"Translated {summary.lines_translated}/{summary.lines_total} lines "
+        f"({summary.provider}) -> {summary.output}"
+    )
     return 0
 
 

@@ -28,12 +28,21 @@ uv sync --extra gemini
 
 ## 사용법
 
-기본 provider를 내장하지 않으므로 `--provider`는 항상 필수입니다. API 키는 각 provider의 환경 변수로만 읽으며 `--api-key` 인자는 받지 않습니다.
+기본 provider를 내장하지 않으므로 `--provider`는 항상 필수입니다. API 키는 각 provider의 환경 변수에서 읽습니다.
 
 ### Hosted provider
 
+Shell:
+
 ```sh
 export OPENROUTER_API_KEY="your-key"
+uv run trans-sub movie.srt --to ko --provider OpenRouter
+```
+
+PowerShell:
+
+```powershell
+$env:OPENROUTER_API_KEY = "your-key"
 uv run trans-sub movie.srt --to ko --provider OpenRouter
 ```
 
@@ -41,8 +50,17 @@ uv run trans-sub movie.srt --to ko --provider OpenRouter
 
 ### 로컬 OpenAI-compatible 서버
 
+Shell:
+
 ```sh
 export CUSTOM_SERVER_ADDRESS="http://<host>:<port>"
+uv run trans-sub movie.srt --to ko --provider "Custom Server" --model "<model-name>"
+```
+
+PowerShell:
+
+```powershell
+$env:CUSTOM_SERVER_ADDRESS = "http://<host>:<port>"
 uv run trans-sub movie.srt --to ko --provider "Custom Server" --model "<model-name>"
 ```
 

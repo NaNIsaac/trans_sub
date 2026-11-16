@@ -1,14 +1,12 @@
 """Thin CLI and Python wrapper around ``pysubtrans`` for ``.srt`` translation."""
 
-from __future__ import annotations
-
 import importlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
 
-import appdirs
 from PySubtrans import (
+    Options,
     SubtitleError,
     SubtitleTranslator,
     TranslationProvider,
@@ -61,7 +59,7 @@ def default_output_path(source: Path, to: str) -> Path:
     return source.with_name(f"{source.stem}.{to}{suffix}")
 
 
-def _resolve_provider(provider: str, options) -> TranslationProvider:
+def _resolve_provider(provider: str, options: Options) -> TranslationProvider:
     # Importing PySubtrans.Providers registers built-in and installed provider plugins.
     importlib.import_module("PySubtrans.Providers")
 
@@ -70,12 +68,13 @@ def _resolve_provider(provider: str, options) -> TranslationProvider:
     except SubtitleError as exc:
         env_var = PROVIDER_KEY_ENV.get(provider)
         msg = str(exc)
-        if env_var and "api key" in msg.lower():
+        lower = msg.lower()
+        if env_var and ("api key" in lower or "aws access key" in lower):
             raise SubtitleError(
                 f"Missing API key for provider {provider!r}: set {env_var} or pass --dry-run"
             ) from exc
         extra = OPTIONAL_PROVIDER_EXTRAS.get(provider)
-        if extra and "unknown translation provider" in msg.lower():
+        if extra and "unknown translation provider" in lower:
             env_note = f" and set {env_var}" if env_var else ""
             raise SubtitleError(
                 f"Provider {provider!r} requires optional extra [{extra}] "
@@ -108,13 +107,10 @@ def translate_srt(
 
     out_path = Path(output) if output is not None else default_output_path(source_path, to)
 
-    app_dir = (
-        Path(config_dir)
-        if config_dir is not None
-        else Path(appdirs.user_config_dir("trans-sub", "NaNIsaac"))
-    )
-    app_dir.mkdir(parents=True, exist_ok=True)
-    ConfigureConfigDir(str(app_dir))
+    if config_dir is not None:
+        app_dir = Path(config_dir)
+        app_dir.mkdir(parents=True, exist_ok=True)
+        ConfigureConfigDir(str(app_dir))
 
     option_kwargs: dict[str, str] = {"provider": provider, "target_language": to}
     if model is not None:
