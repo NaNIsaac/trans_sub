@@ -1,12 +1,30 @@
 [project]
 name = "trans-sub"
 version = "0.1.0"
-description = "Skeleton project for working with .srt subtitle files"
+description = "CLI and Python wrapper around pysubtrans for translating .srt files"
 readme = "README.md"
 requires-python = ">=3.13"
+license = "MIT"
 dependencies = [
+    "pysubtrans>=1.8.0",
     "srt>=3.5.3",
 ]
+
+[project.optional-dependencies]
+openai = ["pysubtrans[openai]"]
+azure = ["pysubtrans[azure]"]
+gemini = ["pysubtrans[gemini]"]
+claude = ["pysubtrans[claude]"]
+mistral = ["pysubtrans[mistral]"]
+bedrock = ["pysubtrans[bedrock]"]
+litellm = ["pysubtrans[litellm]"]
+
+[project.scripts]
+trans-sub = "trans_sub.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.8.0,<0.12.0"]
+build-backend = "uv_build"
 
 [tool.ruff]
 line-length = 100
@@ -20,5 +38,5 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = ["src"]
 testpaths = ["tests"]

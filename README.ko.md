@@ -2,70 +2,62 @@
 
 [English](README.md)
 
-`.srt` 자막 파일을 AI로 번역하는 도구: SRT를 넣으면 파일 전체를 문맥에 맞게 번역한 SRT가 나온다. YouTube 자막 제작을 돕기 위해 시작했고, 계속 실용 도구로 두려는 프로젝트다.
+cue 순서와 타이밍을 유지한 채 `.srt` 자막 파일을 번역하는 [pysubtrans](https://github.com/machinewrapped/llm-subtrans)(`MIT`) 기반 CLI 및 Python 래퍼입니다.
 
-**상태: 초기, 미완성.** 프로젝트 골격만 있다. `main.py`는 인사말만 출력하고 번역 코드는 아직 없다. 재개 계획은 아래에 있다.
+## 설치
 
-이 저장소의 스냅샷(커밋 `18489eb`)이 2026-10-16에 이력과 함께 비공개 `sandbox` 저장소의 `trans_sub/`로 복사되었다. 그 뒤의 커밋은 이 저장소에만 있다.
+Python 3.13과 [uv](https://docs.astral.sh/uv/)가 필요합니다.
+
+기본 설치(`OpenRouter`, `DeepSeek`, `Custom Server`는 별도 SDK 없이 동작):
+
+<!-- test -->
+```sh
+uv sync
+```
+
+<!-- test -->
+```sh
+uv run trans-sub --help
+```
+
+전용 SDK가 필요한 provider는 optional extra(`openai`, `azure`, `gemini`, `claude`, `mistral`, `bedrock`, `litellm`)로 설치합니다:
+
+```sh
+uv sync --extra gemini
+```
 
 ## 사용법
 
-Python 3.13과 [uv](https://docs.astral.sh/uv/)가 필요하다.
+기본 provider를 내장하지 않으므로 `--provider`는 항상 필수입니다. API 키는 각 provider의 환경 변수로만 읽으며 `--api-key` 인자는 받지 않습니다.
 
-```bash
-git clone https://github.com/NaNIsaac/trans_sub.git
-cd trans_sub
-uv run main.py
+### Hosted provider
+
+```sh
+export OPENROUTER_API_KEY="your-key"
+uv run trans-sub movie.srt --to ko --provider OpenRouter
 ```
 
-테스트:
+`OpenAI`, `Gemini`, `Claude`, `DeepSeek`, `Mistral`, `Azure`, `Bedrock`, `LiteLLM`은 각각 `OPENAI_API_KEY`, `GEMINI_API_KEY`, `CLAUDE_API_KEY`, `DEEPSEEK_API_KEY`, `MISTRAL_API_KEY`, `AZURE_API_KEY`, `AWS_ACCESS_KEY_ID`, `LITELLM_API_KEY` 환경 변수를 사용합니다.
 
-```bash
-uv run pytest
+### 로컬 OpenAI-compatible 서버
+
+```sh
+export CUSTOM_SERVER_ADDRESS="http://<host>:<port>"
+uv run trans-sub movie.srt --to ko --provider "Custom Server" --model "<model-name>"
 ```
 
-## 핵심 경험
+### Dry run, 이어하기, Python API
 
+- `--dry-run`: API 키나 네트워크 호출 없이 `pysubtrans`로 입력 `.srt`를 파싱하고 배치 수만 확인합니다.
+- `--resume`: 원본 `.srt` 옆에 `.subtrans` 프로젝트 파일을 저장해 중단된 작업을 이어서 실행합니다.
+- `-o PATH`: 기본 출력 경로(`<stem>.<to>.srt`)를 지정한 경로로 바꿉니다.
+
+```python
+from trans_sub import translate_srt
+
+summary = translate_srt("movie.srt", to="ko", provider="OpenRouter")
 ```
-movie.srt  ->  trans_sub  ->  movie.ko.srt
-```
 
-사용자가 SRT 파일과 목표 언어를 주면, 도구가 주변 자막을 문맥으로 써서 파일 전체를 AI 모델로 번역하고, 같은 자막이 같은 순서·같은 시간에 놓인 유효한 SRT를 쓴다. 누락·중복·순서 변경이 조용히 일어나지 않으며, 중단된 실행은 이어서 할 수 있다.
+## 라이선스
 
-## 필요한 기능 (아직 구현 안 됨)
-
-| 기능 | 의미 |
-| --- | --- |
-| 긴 파일 | 모델의 context·출력 한도에 맞게 배치로 나눈다. 파일당 수백~수천 cue |
-| 문맥 | 각 배치에 앞뒤 cue(번역은 한 번만)와 선택적 용어집, 영상 설명을 함께 준다 |
-| 순서·시간 | 출력의 cue 수, index, 시작·종료 시간이 입력과 같고 텍스트만 바뀐다 |
-| 검증 | 누락·중복·병합·분할된 cue, 빈 번역, 깨진 태그를 cue 단위로 찾아 보고한다 |
-| 중간 저장·재시도 | 끝난 배치는 즉시 디스크에 쓰고, 실패한 배치는 재시도하며, 재실행은 끝난 배치를 건너뛴다 |
-| 모델 | 여러 모델을 쓸 수 있는 provider 인터페이스. 특정 provider를 가정하지 않는다 |
-| MCP | 같은 기능을 노출하는 MCP 서버. AI 클라이언트가 번역을 구동한다 |
-| CLI | 독립 명령 `trans-sub movie.srt --to ko` |
-
-일반 SRT 처리(파싱, 직렬화, 싱크 조정, 병합, 분할, 겹침 검사)는 trans_sub의 범위가 아니다. 그 부분은 라이브러리를 쓰며, 현재 의존성은 `srt`다.
-
-## 검증
-
-`srt` 파서는 아래를 검사하지 않으므로 파이프라인이 해야 한다.
-
-- 겹치는 cue를 조용히 받아들인다.
-- 불연속·중복 index를 그대로 둔다.
-- cue 내용 안의 빈 줄은 표현할 수 없으므로, 번역에 빈 줄이 있으면 정리해야 한다(`srt.make_legal_content`).
-- `compose`는 입력과 무관하게 LF 줄바꿈으로 쓴다.
-- 깨진 블록은 `srt.SRTParseError`를 내므로, 손상된 입력은 조용히 넘어가지 않고 실패한다.
-
-`tests/test_srt_contract.py`가 `srt` 3.5.3의 이 동작들을 고정한다.
-
-## 재개 계획
-
-1. 파일을 `utf-8-sig`로 읽고 `srt`로 파싱하며, `SRTParseError`면 실패한다.
-2. 문맥 배치: 고정 크기 창과 양쪽 문맥 cue.
-3. `Translator` protocol과 첫 구현 하나. 프롬프트는 cue index를 키로 하는 JSON 목록을 요구해 응답을 입력에 대응시킨다.
-4. 각 응답을 위 검증 규칙으로 확인하고, 실패하면 이유와 함께 배치를 재시도한다.
-5. 끝난 배치를 sidecar JSON에 쓰고, 마지막에 SRT를 직렬화한다.
-6. 같은 함수 위에 CLI, 그다음 MCP 서버.
-
-각 단계는 가짜 translator로 테스트할 수 있어서 테스트 스위트에 API key가 필요 없다.
+`trans_sub`는 [MIT](LICENSE) 라이선스를 따르며 `pysubtrans`(`MIT`)와 `srt`(`MIT`)에 의존합니다.
