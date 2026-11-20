@@ -1,7 +1,7 @@
 """CLI entry point for ``trans-sub``.
 
-``translate`` sends the file to an LLM provider through pysubtrans. ``build``, ``check`` and
-``template`` work offline from a translation table. The bare form ``trans-sub <file> --to ...``
+``translate`` sends the file to an LLM provider through pysubtrans. ``build``, ``check``,
+``template`` and ``clip`` work offline. The bare form ``trans-sub <file> --to ...``
 is ``translate``.
 """
 
@@ -16,10 +16,11 @@ from srt import SRTParseError
 
 from trans_sub import subrip, translate_srt
 from trans_sub.check import Limits, base_name, check
+from trans_sub.clip import MIN_PIECE_MS, clip, parse_range, parse_seconds
 from trans_sub.table import Table, TableError
 from trans_sub.template import prompt_text, table_text
 
-COMMANDS = ("translate", "build", "check", "template")
+COMMANDS = ("translate", "build", "check", "template", "clip")
 
 
 def add_translate_args(parser: argparse.ArgumentParser) -> None:
@@ -86,9 +87,11 @@ def command_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--table",
         type=Path,
-        action="append",
+        nargs="+",
+        action="extend",
         required=True,
-        help="Translation table; repeat to read several (they must agree).",
+        metavar="FILE",
+        help="Translation tables, one or more (they must agree); the flag may also be repeated.",
     )
     p.add_argument(
         "--langs", nargs="+", help="Languages to write (default: every one in the table)."
@@ -149,10 +152,43 @@ def command_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("source", type=Path, help="The source .srt file.")
     p.add_argument("--langs", nargs="+", required=True, help="Languages to translate into.")
-    p.add_argument("--table", type=Path, action="append", help="Existing table to fill rows from.")
+    p.add_argument(
+        "--table",
+        type=Path,
+        nargs="+",
+        action="extend",
+        metavar="FILE",
+        help="Existing tables to fill rows from; the flag may also be repeated.",
+    )
     p.add_argument("--out", type=Path, help="Output directory (default: the source's directory).")
     p.add_argument("--force", action="store_true", help="Overwrite an existing table file.")
     p.set_defaults(run=run_template)
+
+    p = sub.add_parser(
+        "clip",
+        help="cut .srt files down to time ranges, for a short",
+        description="Keep the cues between --from and --to, shifted to start at zero; each --then "
+        "range plays after the one before. Cues are cut at range edges and pieces shorter than "
+        "--min-piece are dropped. Each file is written as <name><suffix>.<lang>.srt.",
+    )
+    p.add_argument("files", type=Path, nargs="+", help="The .srt files to cut.")
+    p.add_argument("--from", dest="start", required=True, help="Start of the first range, seconds.")
+    p.add_argument("--to", dest="end", required=True, help="End of the first range, seconds.")
+    p.add_argument(
+        "--then",
+        action="append",
+        default=[],
+        metavar="FROM:TO",
+        help="A further range in seconds, played next; repeat for more.",
+    )
+    p.add_argument("--suffix", default="_clip", help="Added to the name (default: _clip).")
+    p.add_argument("--out", type=Path, help="Output directory (default: each file's directory).")
+    p.add_argument(
+        "--min-piece",
+        default=str(MIN_PIECE_MS / 1000),
+        help="Shortest piece of a cut cue to keep, seconds (default: 0.5).",
+    )
+    p.set_defaults(run=run_clip)
     return parser
 
 
@@ -244,6 +280,25 @@ def run_template(args: argparse.Namespace) -> int:
     prompt_path.write_text(prompt_text(table, args.langs), encoding="utf-8", newline="\n")
     print(table_path)
     print(prompt_path)
+    return 0
+
+
+def run_clip(args: argparse.Namespace) -> int:
+    ranges = [(parse_seconds(args.start), parse_seconds(args.end))]
+    ranges += [parse_range(value) for value in args.then]
+    min_piece = parse_seconds(args.min_piece)
+    if not args.suffix:
+        raise ValueError("--suffix must not be empty: the clip would overwrite its source")
+    jobs = []
+    for path in args.files:
+        name = base_name(path)
+        tag = path.stem[len(name) + 1 :]
+        target = (args.out or path.parent) / f"{name}{args.suffix}{'.' + tag if tag else ''}.srt"
+        jobs.append((target, clip(subrip.read(path), ranges, min_piece)))
+    for target, cues in jobs:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        subrip.write(target, cues)
+        print(f"{target}: {len(cues)} cues")
     return 0
 
 
