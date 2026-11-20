@@ -1,0 +1,12 @@
+1
+00:00:01,000 --> 00:00:03,000
+Good morning, everyone.
+
+2
+00:00:03,500 --> 00:00:06,000
+The train is late again,
+so we start without it.
+
+3
+00:00:06,500 --> 00:00:08,000
+Good morning, everyone.

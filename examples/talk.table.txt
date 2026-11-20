@@ -1,0 +1,9 @@
+# Example table for talk.en.srt. A two-line source cue is keyed by its lines joined by a space.
+
+@Good morning, everyone.
+fr=Bonjour à tous.
+de=Guten Morgen zusammen.
+
+@The train is late again, so we start without it.
+fr=Le train est encore en retard,|on commence sans lui.
+de=Der Zug ist wieder zu spät,|wir fangen ohne ihn an.

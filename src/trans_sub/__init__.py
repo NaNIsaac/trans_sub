@@ -1,4 +1,4 @@
-"""Thin CLI and Python wrapper around ``pysubtrans`` for ``.srt`` translation."""
+"""Translate .srt subtitle files from a translation table or through pysubtrans, and check them."""
 
 import importlib
 import os
