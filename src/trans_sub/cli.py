@@ -15,6 +15,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="trans-sub",
         description="Translate an .srt subtitle file using pysubtrans and provider env vars.",
+        epilog="'trans-sub youtube --help': put titles, descriptions and subtitles on a video.",
     )
     parser.add_argument("source", type=Path, help="Path to the input .srt file.")
     parser.add_argument("--to", required=True, help="Target language (for example ko or French).")
@@ -45,6 +46,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["youtube"]:
+        from trans_sub.youtube.cli import main as youtube_main
+
+        return youtube_main(argv[1:])
     args = build_parser().parse_args(argv)
     try:
         summary = translate_srt(
