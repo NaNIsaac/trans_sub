@@ -1,4 +1,5 @@
-"""A stand-in for the googleapiclient YouTube v3 service: same call chain, records every call."""
+"""A stand-in for the googleapiclient YouTube v3 service: same call chain, records every call.
+Nothing reaches YouTube."""
 
 from copy import deepcopy
 
@@ -22,9 +23,18 @@ LANGS = [
 LANGS += ["zh-Hans", "zh-Hant"]
 
 
+class _Progress:
+    def __init__(self, share):
+        self.share = share
+
+    def progress(self):
+        return self.share
+
+
 class _Request:
-    def __init__(self, result=None, error=None, on_execute=None):
+    def __init__(self, result=None, error=None, on_execute=None, chunks=2):
         self.result, self.error, self.on_execute = result, error, on_execute
+        self.chunks, self.sent = chunks, 0
 
     def execute(self):
         if self.error:
@@ -32,6 +42,15 @@ class _Request:
         if self.on_execute:
             self.on_execute()
         return deepcopy(self.result)
+
+    def next_chunk(self):
+        """A resumable upload: ``chunks`` progress reports, then the response."""
+        if self.error:
+            raise self.error
+        self.sent += 1
+        if self.sent <= self.chunks:
+            return _Progress(self.sent / (self.chunks + 1)), None
+        return None, self.execute()
 
 
 class _Resource:
@@ -64,6 +83,9 @@ class FakeYouTube:
     def i18nLanguages(self):
         return _Resource(self, "i18nLanguages")
 
+    def thumbnails(self):
+        return _Resource(self, "thumbnails")
+
     def respond(self, key, kwargs):
         if key in self.fail:
             return _Request(error=self.fail[key])
@@ -79,6 +101,8 @@ class FakeYouTube:
                 self.video.update(deepcopy(kwargs["body"]))
 
             return _Request(kwargs["body"], on_execute=store)
+        if key == "videos.insert":
+            return _Request({"id": "up456", **deepcopy(kwargs["body"])})
         return _Request({"id": "new"})
 
     def called(self):

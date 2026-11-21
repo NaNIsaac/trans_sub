@@ -9,7 +9,7 @@
 - **번역표로** (`template`, `build`, `check`, `clip`): 원본의 서로 다른 줄마다, 언어마다 한 행씩인 텍스트 표를 직접, 번역가가, 또는 아무 AI 채팅이 채웁니다. `trans-sub`가 그 표로 언어마다 `.srt`를 하나씩 쓰고 모든 파일을 검사합니다. 이 명령들은 네트워크를 쓰지 않습니다.
 - **LLM provider로** (`translate`): [pysubtrans](https://github.com/machinewrapped/llm-subtrans)(`MIT`)를 거쳐 OpenRouter, Gemini 같은 provider에 파일을 보냅니다. API 키가 필요합니다.
 
-`youtube` 명령은 모든 언어의 제목·설명·자막을 YouTube 영상 하나에 넣습니다([YouTube에 올리기](#youtube에-올리기)).
+`youtube` 명령은 영상을 올리고 모든 언어의 제목·설명·자막을 넣습니다([YouTube에 올리기](#youtube에-올리기)).
 
 ## 설치
 
@@ -175,7 +175,7 @@ summary = translate_srt("movie.srt", to="ko", provider="OpenRouter")
 
 ## YouTube에 올리기
 
-`trans-sub youtube push`는 내 영상 하나에 모든 언어의 제목, 설명, 자막을 넣습니다. 먼저 영상을 읽고, 언어마다 무엇을 추가·갱신·유지할지와 드는 quota를 보여 줍니다. `--apply`를 붙이기 전에는 아무것도 바꾸지 않습니다. 영상에 이미 있고 입력에 없는 언어는 그대로 둡니다.
+`trans-sub youtube push`는 내 영상 하나에 모든 언어의 제목, 설명, 자막을 넣습니다. 먼저 영상을 읽고, 언어마다 무엇을 추가·갱신·유지할지와 드는 quota를 보여 줍니다. `--apply`를 붙이기 전에는 아무것도 바꾸지 않습니다. 영상에 이미 있고 입력에 없는 언어는 그대로 둡니다. `trans-sub youtube upload`는 새 영상에 같은 일을 합니다. 파일을 올리면서 이것들을 한 번에 넣습니다([새 영상](#새-영상)).
 
 선택 설치인 Google 패키지를 설치합니다:
 
@@ -238,9 +238,25 @@ uv run trans-sub youtube push --video <id> --meta meta.json --subs subs --stem t
 
 제목은 100자, 설명은 5000바이트까지이고 둘 다 `<`, `>`를 쓸 수 없습니다. push는 쓰기 전에 이를 검사합니다.
 
+### 새 영상
+
+`youtube upload`는 영상 파일을 제목, 설명, 썸네일, 자막과 함께 올립니다. push처럼 먼저 보낼 내용과 quota를 보여 주고, `--apply`가 있을 때만 올립니다:
+
+```sh
+uv run trans-sub youtube upload --file song.mp4 --meta meta.json --default-lang ko --subs subs --thumb cover.png
+uv run trans-sub youtube upload --file song.mp4 --meta meta.json --default-lang ko --subs subs --thumb cover.png --apply
+```
+
+- `--default-lang`은 영상의 언어입니다. `--meta`에서 그 언어의 항목이 영상 자체의 제목과 설명이 되고, 다른 언어는 현지화가 됩니다. `--meta`에 그 언어가 있어야 합니다.
+- `--subs subs`는 모든 `subs/<stem>.<lang>.srt`를 씁니다. stem은 `--stem`을 주지 않으면 영상 파일 이름(`song`)입니다. 영상이 올라간 뒤 각각 새 자막 트랙이 됩니다.
+- `--thumb`는 썸네일을 정합니다(PNG 또는 JPEG, 2 MB까지). YouTube는 맞춤 썸네일 기능이 켜진 채널(YouTube Studio에서 전화번호 인증)에서만 받습니다.
+- 영상은 **비공개**로 올라갑니다. `--privacy unlisted`나 `public`으로 요청할 수 있지만, YouTube는 감사를 통과하지 않은 API 프로젝트가 올린 영상을 요청과 상관없이 모두 비공개로 둡니다. YouTube Studio에서 바꿉니다. `--publish-at 2026-11-25T18:00:00+09:00`은 비공개로 올리고 그 시각에 YouTube가 공개합니다.
+- `--made-for-kids`는 아동용으로 선언합니다(없으면 아동용이 아니라고 선언합니다). `--synthetic yes`는 AI 생성 음성 같은 변경되거나 합성된 콘텐츠를 선언합니다. `--category 10`은 카테고리를 정합니다(10은 음악).
+- 파일은 8 MB씩 나눠 올리며 진행률을 보여 줍니다. 영상이 올라간 뒤 단계(썸네일이나 자막)가 실패하면 오류에 새 영상 ID가 나오므로, 나머지는 `youtube push --video <id>`로 이어 갑니다.
+
 ### Quota
 
-호출마다 프로젝트의 하루 quota 10,000 단위(태평양 시간 자정에 초기화)에서 빠집니다. `--max-units`(기본 9000)를 넘는 push는 적용을 거부합니다.
+호출마다 프로젝트의 하루 quota 10,000 단위(태평양 시간 자정에 초기화)에서 빠집니다. `--max-units`(기본 9000)를 넘는 push나 upload는 적용을 거부합니다.
 
 | 호출 | 단위 | 용도 |
 |---|---|---|
@@ -250,8 +266,10 @@ uv run trans-sub youtube push --video <id> --meta meta.json --subs subs --stem t
 | `videos.update` | 50 | 모든 제목과 설명, 한 번 |
 | `captions.insert` | 400 | 새 트랙마다 |
 | `captions.update` | 450 | 바꾸는 트랙마다 |
+| `videos.insert` | 1600 | 영상 올리기, 모든 제목과 설명 포함 |
+| `thumbnails.set` | 50 | 썸네일 |
 
-출처: [quota 비용](https://developers.google.com/youtube/v3/determine_quota_cost). 새 트랙 17개와 메타데이터는 52 + 50 + 17 × 400 = 6902단위, 트랙 17개를 바꾸면 7752단위이므로 하루에 영상 하나의 전체 push는 들어가고 둘은 들어가지 않습니다.
+출처: [quota 비용](https://developers.google.com/youtube/v3/determine_quota_cost). 새 트랙 17개와 메타데이터는 52 + 50 + 17 × 400 = 6902단위, 트랙 17개를 바꾸면 7752단위이므로 하루에 영상 하나의 전체 push는 들어가고 둘은 들어가지 않습니다. 썸네일과 트랙 17개를 붙여 영상을 올리면 1 + 1600 + 50 + 17 × 400 = 8451단위입니다.
 
 ## 라이선스
 

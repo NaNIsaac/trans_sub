@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 # Captions need youtube.force-ssl (or youtubepartner, for content owners); it also covers
-# videos.update, so it is the one scope requested.
+# videos.update, videos.insert and thumbnails.set, so it is the one scope requested.
 SCOPES = ["https://www.googleapis.com/auth/youtube.force-ssl"]
 CLIENT_SECRET_ENV = "TRANS_SUB_YOUTUBE_CLIENT_SECRET"
 TOKEN_ENV = "TRANS_SUB_YOUTUBE_TOKEN"
@@ -78,9 +78,27 @@ def youtube_service(client_secret: Path | None = None, token: Path | None = None
     return build("youtube", "v3", credentials=creds, cache_discovery=False)
 
 
-def media_upload(path: Path) -> Any:
+def _file_upload(path: Path, mimetype: str, resumable: bool) -> Any:
     try:
         from googleapiclient.http import MediaFileUpload
     except ImportError:
         raise AuthError(EXTRA_HINT) from None
-    return MediaFileUpload(str(path), mimetype="application/octet-stream", resumable=False)
+    if resumable:
+        # Chunks let a dropped connection resume instead of sending the whole file again.
+        return MediaFileUpload(
+            str(path), mimetype=mimetype, chunksize=8 * 1024 * 1024, resumable=True
+        )
+    return MediaFileUpload(str(path), mimetype=mimetype, resumable=False)
+
+
+def media_upload(path: Path) -> Any:
+    return _file_upload(path, "application/octet-stream", resumable=False)
+
+
+def video_upload(path: Path) -> Any:
+    return _file_upload(path, "video/*", resumable=True)
+
+
+def image_upload(path: Path) -> Any:
+    kind = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
+    return _file_upload(path, kind, resumable=False)
