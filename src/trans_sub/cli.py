@@ -64,7 +64,8 @@ def command_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="trans-sub",
         description="Translate .srt subtitle files and check the translations against the source.",
-        epilog="'trans-sub <file> --to ...' without a command is 'trans-sub translate'.",
+        epilog="'trans-sub <file> --to ...' without a command is 'trans-sub translate'. "
+        "'trans-sub youtube --help': put titles, descriptions and subtitles on a video.",
     )
     sub = parser.add_subparsers(dest="command", required=True, metavar="command")
 
@@ -249,6 +250,10 @@ def run_template(args: argparse.Namespace) -> int:
 
 def main(argv: Sequence[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["youtube"]:
+        from trans_sub.youtube.cli import main as youtube_main
+
+        return youtube_main(argv[1:])
     if argv and argv[0] not in (*COMMANDS, "-h", "--help"):
         return run_translate(build_parser().parse_args(argv))
     if isinstance(sys.stdout, io.TextIOWrapper):
