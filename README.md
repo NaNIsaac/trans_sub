@@ -9,7 +9,7 @@ A translated file keeps the source's cues and times; only the text changes. Ther
 - **From a translation table** (`template`, `build`, `check`, `clip`): you, a translator or any AI chat fill a plain-text table with one row per distinct source line and language. `trans-sub` writes one `.srt` per language from it and checks every file. These commands make no network calls.
 - **From an LLM provider** (`translate`): sends the file through [pysubtrans](https://github.com/machinewrapped/llm-subtrans) (`MIT`) to a provider such as OpenRouter or Gemini, with your API key.
 
-The `youtube` command puts the title, description and subtitles of every language on one YouTube video ([Publishing to YouTube](#publishing-to-youtube)).
+The `youtube` command uploads a video and puts the title, description and subtitles of every language on it ([Publishing to YouTube](#publishing-to-youtube)).
 
 ## Install
 
@@ -174,7 +174,7 @@ summary = translate_srt("movie.srt", to="ko", provider="OpenRouter")
 
 ## Publishing to YouTube
 
-`trans-sub youtube push` puts the title, description and subtitles of every language on one video you own. It reads the video first and shows, per language, what it would add, update or leave alone, with the quota it costs. Nothing changes until you add `--apply`. Languages already on the video that are not in your input are kept.
+`trans-sub youtube push` puts the title, description and subtitles of every language on one video you own. It reads the video first and shows, per language, what it would add, update or leave alone, with the quota it costs. Nothing changes until you add `--apply`. Languages already on the video that are not in your input are kept. `trans-sub youtube upload` does the same for a new video: it uploads the file with all of it in one go ([A new video](#a-new-video)).
 
 Install the optional Google packages:
 
@@ -237,9 +237,25 @@ uv run trans-sub youtube push --video <id> --meta meta.json --subs subs --stem t
 
 Titles are limited to 100 characters, descriptions to 5000 bytes, and neither may contain `<` or `>`; the push checks this before it writes.
 
+### A new video
+
+`youtube upload` uploads a video file with its titles, descriptions, thumbnail and subtitles. Like a push, it first shows what it would send and the quota, and uploads only with `--apply`:
+
+```sh
+uv run trans-sub youtube upload --file song.mp4 --meta meta.json --default-lang ko --subs subs --thumb cover.png
+uv run trans-sub youtube upload --file song.mp4 --meta meta.json --default-lang ko --subs subs --thumb cover.png --apply
+```
+
+- `--default-lang` names the video's language; its entry in `--meta` becomes the video's own title and description, and the other languages become localizations. `--meta` must have that language.
+- `--subs subs` takes every `subs/<stem>.<lang>.srt`, where the stem is the video file's name (`song`) unless `--stem` gives another. Each becomes a new caption track after the video is up.
+- `--thumb` sets the thumbnail (PNG or JPEG, up to 2 MB). YouTube accepts a custom thumbnail only from a channel with the feature enabled (in YouTube Studio, a verified phone number).
+- The video goes up **private**. `--privacy unlisted` or `public` asks for more, but YouTube keeps every video uploaded by an API project that has not passed its audit private, whatever the request says; change it in YouTube Studio. `--publish-at 2026-11-25T18:00:00+09:00` keeps it private and lets YouTube make it public at that time.
+- `--made-for-kids` declares the video made for kids (the upload declares it not made for kids otherwise). `--synthetic yes` declares altered or synthetic content, such as AI-generated voices. `--category 10` sets the category (10 is Music).
+- The file goes up in 8 MB chunks with the progress shown. If a step after the video fails (the thumbnail or a caption), the error names the new video's ID, so the rest can follow with `youtube push --video <id>`.
+
 ### Quota
 
-Each call costs units from the project's daily quota of 10,000 (reset at midnight Pacific time). A push refuses to apply above `--max-units` (default 9000).
+Each call costs units from the project's daily quota of 10,000 (reset at midnight Pacific time). A push or upload refuses to apply above `--max-units` (default 9000).
 
 | Call | Units | Used for |
 |---|---|---|
@@ -249,8 +265,10 @@ Each call costs units from the project's daily quota of 10,000 (reset at midnigh
 | `videos.update` | 50 | all titles and descriptions, once |
 | `captions.insert` | 400 | each new track |
 | `captions.update` | 450 | each replaced track |
+| `videos.insert` | 1600 | uploading the video, with all titles and descriptions |
+| `thumbnails.set` | 50 | the thumbnail |
 
-Source: [quota costs](https://developers.google.com/youtube/v3/determine_quota_cost). Seventeen new tracks with metadata cost 52 + 50 + 17 × 400 = 6902 units; replacing seventeen tracks costs 7752, so one video's full push fits in a day, two do not.
+Source: [quota costs](https://developers.google.com/youtube/v3/determine_quota_cost). Seventeen new tracks with metadata cost 52 + 50 + 17 × 400 = 6902 units; replacing seventeen tracks costs 7752, so one video's full push fits in a day, two do not. Uploading a video with a thumbnail and seventeen tracks costs 1 + 1600 + 50 + 17 × 400 = 8451 units.
 
 ## License
 
