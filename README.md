@@ -6,7 +6,7 @@ Translate `.srt` subtitle files into many languages and check the result against
 
 A translated file keeps the source's cues and times; only the text changes. There are two ways to get the text:
 
-- **From a translation table** (`template`, `build`, `check`): you, a translator or any AI chat fill a plain-text table with one row per distinct source line and language. `trans-sub` writes one `.srt` per language from it and checks every file. These commands make no network calls.
+- **From a translation table** (`template`, `build`, `check`, `clip`): you, a translator or any AI chat fill a plain-text table with one row per distinct source line and language. `trans-sub` writes one `.srt` per language from it and checks every file. These commands make no network calls.
 - **From an LLM provider** (`translate`): sends the file through [pysubtrans](https://github.com/machinewrapped/llm-subtrans) (`MIT`) to a provider such as OpenRouter or Gemini, with your API key.
 
 The `youtube` command puts the title, description and subtitles of every language on one YouTube video ([Publishing to YouTube](#publishing-to-youtube)).
@@ -50,6 +50,15 @@ This writes `out/talk.fr.srt` and `out/talk.de.srt`. Check them against the sour
 uv run trans-sub check examples/talk.en.srt out
 ```
 
+Cut the second half out of every language for a short; it starts at zero:
+
+<!-- test -->
+```sh
+uv run trans-sub clip out/talk.fr.srt out/talk.de.srt --from 3.5 --to 8
+```
+
+This writes `out/talk_clip.fr.srt` and `out/talk_clip.de.srt`.
+
 ## Translation tables
 
 One block per distinct source line. A block starts with `@` and the line; each `<lang>=<text>` row under it is that line in one language.
@@ -68,19 +77,19 @@ fr=Le train est encore en retard,|on commence sans lui.
 - `|` splits a translation into two lines of the cue.
 - Every cue with the same source text gets the same translation. A table that gives one line two different translations in the same language is an error.
 - An empty row counts as missing. `build` stops with the list of missing lines and writes nothing.
-- `--table` can be repeated (for example, one table per batch of languages). The tables must agree.
+- `--table` takes one or more files (`--table a.txt b.txt`), and the flag may also be repeated; for example, one table per batch of languages. The tables must agree.
 
 ## Commands
 
 ### `template`
 
-`trans-sub template <source.srt> --langs <lang>... [--table <file>] [--out <dir>] [--force]`
+`trans-sub template <source.srt> --langs <lang>... [--table <file>...] [--out <dir>] [--force]`
 
 Writes `<name>.table.txt` with every distinct source line once and a row per language, and `<name>.prompt.txt`: instructions and the table, to paste into any chat. `<name>` is the source file name without `.srt` and without a language tag (`talk.en.srt` gives `talk`). Rows found in `--table` files are filled in, so adding a language keeps the earlier ones. An existing table file is not overwritten unless `--force` is given.
 
 ### `build`
 
-`trans-sub build <source.srt> --table <file> [--langs <lang>...] [--out <dir>] [--name <name>] [--source-lang <lang>]`
+`trans-sub build <source.srt> --table <file>... [--langs <lang>...] [--out <dir>] [--name <name>] [--source-lang <lang>]`
 
 Writes `<name>.<lang>.srt` for each language: the source's cues and times with the table's text. Without `--langs`, every language in the table is written. With `--source-lang`, that language in `--langs` writes a copy of the source. Output is UTF-8 without a byte order mark, with LF line ends.
 
@@ -96,6 +105,14 @@ A directory stands for its `<name>.<lang>.srt` files. Each file fails if:
 - a line is longer than `--width` characters (default 42), or `--dense-width` (default 20) for a line with Chinese, Japanese, Korean or Thai characters. Marks above or below a letter, such as Thai vowels and tone marks, are not counted.
 
 A cue read faster than `--cps` characters a second (default 20; `--dense-cps` 15) is a warning, not a failure: the source fixes the time, so the fix is a shorter translation. A cue left in the source text is not counted. `--cps 0` turns the warning off. The exit code is 1 on any failure, or when no file was found.
+
+### `clip`
+
+`trans-sub clip <file.srt>... --from <s> --to <s> [--then <from>:<to>]... [--suffix _clip] [--out <dir>] [--min-piece 0.5]`
+
+Keeps the cues between `--from` and `--to` (seconds), shifted to start at zero. Each `--then` range plays after the one before, so a looping short that ends on its own opening is `--from <body start> --to <body end> --then <lead start>:<body start>`. A cue that crosses a range edge is cut at the edge; a piece shorter than `--min-piece` seconds is dropped. `talk.fr.srt` is written as `talk_clip.fr.srt`.
+
+Cut the source and every translation with the same ranges, so all of them keep the same cues and times. `check` on the clipped files then compares against the clipped source.
 
 ## Translating with an LLM provider
 

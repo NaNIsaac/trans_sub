@@ -137,7 +137,7 @@ def test_help_lists_the_commands(capsys):
     with pytest.raises(SystemExit):
         main(["--help"])
     out = capsys.readouterr().out
-    for command in ("translate", "build", "check", "template"):
+    for command in ("translate", "build", "check", "template", "clip"):
         assert command in out
 
 
@@ -149,3 +149,24 @@ def test_translate_command_and_bare_form_take_the_same_arguments(work, capsys, m
     assert main([src, "--to", "ko", "--provider", "OpenRouter", "--dry-run"]) == 0
     assert capsys.readouterr().out == first
     assert first.startswith("Dry run: 3 lines")
+
+
+def test_table_takes_several_files_after_one_flag_or_a_repeated_flag(work):
+    (work / "fr.txt").write_text(
+        "@Good morning\nfr=Bonjour\n@See you\nfr=À plus\n", encoding="utf-8"
+    )
+    (work / "es.txt").write_text(
+        "@Good morning\nes=Hola\n@See you\nes=Hasta luego\n", encoding="utf-8"
+    )
+    src = str(work / "talk.en.srt")
+    out = work / "o"
+    assert (
+        main(
+            ["build", src, "--table", str(work / "fr.txt"), str(work / "es.txt"), "--out", str(out)]
+        )
+        == 0
+    )
+    assert sorted(p.name for p in out.iterdir()) == ["talk.es.srt", "talk.fr.srt"]
+    args = ["build", src, "--table", str(work / "fr.txt"), "--table", str(work / "es.txt")]
+    assert main([*args, "--out", str(work / "p")]) == 0
+    assert len(list((work / "p").iterdir())) == 2
