@@ -1,7 +1,7 @@
 [project]
 name = "trans-sub"
 version = "0.1.0"
-description = "CLI and Python wrapper around pysubtrans for translating .srt files"
+description = "Translate .srt subtitle files from a translation table or an LLM provider, and check the result"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
